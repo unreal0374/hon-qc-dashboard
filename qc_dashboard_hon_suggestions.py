@@ -1,120 +1,116 @@
-
 import streamlit as st
 import pandas as pd
 from PIL import Image
-import base64
 import io
-from datetime import datetime
 
-# Define QC criteria with weights and suggestions
-criteria = [
+# Define QC criteria based on HON guidelines
+qc_criteria = [
     {
         "name": "Logo Placement",
+        "description": "Ensure logo is present and correctly placed if applicable.",
         "weight": 10,
-        "description": "Ensure logo is visible and correctly placed if applicable.",
         "suggestion": "Ensure the logo is visible, correctly placed, and not obstructed by other elements."
     },
     {
         "name": "Color Palette",
+        "description": "Use light, airy neutrals with vibrant pops. Avoid overly muted, dark, or clashing patterns.",
         "weight": 15,
-        "description": "Use light, airy neutrals with vibrant pops. Avoid overly dark or clashing patterns.",
         "suggestion": "Use lighter neutrals with vibrant pops. Avoid overly dark tones or clashing patterns."
     },
     {
         "name": "Typography",
-        "weight": 10,
         "description": "Fonts should align with HON’s brand tone (if text is present).",
+        "weight": 10,
         "suggestion": "Use brand-approved fonts. Avoid decorative or inconsistent typefaces."
     },
     {
         "name": "Image Quality",
-        "weight": 10,
         "description": "Bright, natural lighting with soft shadows. Avoid harsh or fluorescent lighting.",
+        "weight": 10,
         "suggestion": "Improve lighting—use natural or soft diffused light. Avoid harsh shadows or low resolution."
     },
     {
         "name": "Composition",
-        "weight": 15,
         "description": "Product should be the focal point. Use eye-level or overhead angles. Avoid clutter.",
+        "weight": 15,
         "suggestion": "Make the product the focal point. Use clean spacing and avoid clutter."
     },
     {
         "name": "Talent Representation",
-        "weight": 10,
         "description": "Diverse, natural, candid poses. Avoid overly posed or executive aesthetics.",
+        "weight": 10,
         "suggestion": "Use diverse, candid poses. Avoid overly posed or executive-style clothing."
     },
     {
         "name": "Propping & Accessories",
+        "description": "Use minimal, intentional props. Avoid clutter or irrelevant items.",
         "weight": 10,
-        "description": "Use minimal, intentional props (books, plants, tech). Avoid clutter or irrelevant items.",
         "suggestion": "Use minimal, intentional props. Avoid clutter or irrelevant items."
     },
     {
         "name": "Architectural Elements",
+        "description": "Include realistic flooring, windows, and wall treatments. Avoid traditional styles.",
         "weight": 10,
-        "description": "Include realistic flooring, windows, and wall treatments. Avoid traditional or uninspiring styles.",
-        "suggestion": "Include realistic flooring, windows, and wall treatments. Avoid traditional styles."
+        "suggestion": "Include realistic architectural elements. Avoid traditional or uninspiring styles."
     },
     {
         "name": "Vibe/Impression",
-        "weight": 10,
         "description": "Energetic, business casual, approachable. Avoid overly formal or unrealistic settings.",
+        "weight": 10,
         "suggestion": "Aim for a business casual, approachable feel. Avoid overly formal or sterile environments."
     }
 ]
 
-# Initialize session state
-if "reviews" not in st.session_state:
-    st.session_state.reviews = []
+st.title("HON Image QC Dashboard")
 
-st.title("🧪 HON Image QC Dashboard")
-st.markdown("Upload images and review them based on HON's 2025 Image Style Guidelines.")
-
-uploaded_files = st.file_uploader("Upload one or more images", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+uploaded_files = st.file_uploader("Upload Images for Review", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
 
 if uploaded_files:
+    results = []
+
     for uploaded_file in uploaded_files:
         st.header(f"Review: {uploaded_file.name}")
         image = Image.open(uploaded_file)
         st.image(image, caption=uploaded_file.name, use_column_width=True)
 
-        scores = []
+        total_score = 0
         suggestions = []
 
-        for item in criteria:
+        for item in qc_criteria:
             score = st.slider(
-                f"{item['name']} ({item['description']})",
+                label=f"{item['name']} ({item['description']})",
                 min_value=0,
-                max=5,
+                max_value=5,
                 value=3,
                 key=f"{uploaded_file.name}_{item['name']}"
             )
-            scores.append((item["name"], score, item["weight"]))
+            weighted_score = score * item["weight"]
+            total_score += weighted_score
+
             if score < 3:
-                st.markdown(f"🔧 **Suggestion:** {item['suggestion']}")
                 suggestions.append(f"{item['name']}: {item['suggestion']}")
 
-        # Calculate weighted score
-        weighted_score = sum(score * weight for _, score, weight in scores) / sum(item["weight"] for item in criteria)
-        status = "✅ Pass" if weighted_score >= 4 else "❌ Needs Improvement"
+        final_score = total_score / sum([c["weight"] * 5 for c in qc_criteria]) * 100
+        status = "Pass" if final_score >= 80 else "Fail"
 
-        # Save review
-        if st.button(f"Save Review for {uploaded_file.name}"):
-            st.session_state.reviews.append({
-                "Image": uploaded_file.name,
-                "Score": round(weighted_score * 20, 1),
-                "Status": status,
-                "Suggestions": "; ".join(suggestions)
-            })
-            st.success(f"Review saved for {uploaded_file.name}")
+        st.markdown(f"**Final Score:** {final_score:.2f} / 100")
+        st.markdown(f"**Status:** {status}")
 
-# Display summary table
-if st.session_state.reviews:
-    st.subheader("📊 Review Summary")
-    df = pd.DataFrame(st.session_state.reviews)
+        if suggestions:
+            st.markdown("**Suggestions for Improvement:**")
+            for s in suggestions:
+                st.write(f"- {s}")
+
+        results.append({
+            "Image": uploaded_file.name,
+            "Score": round(final_score, 2),
+            "Status": status,
+            "Suggestions": "; ".join(suggestions)
+        })
+
+    st.subheader("Review Summary")
+    df = pd.DataFrame(results)
     st.dataframe(df)
 
-    # Download CSV
-    csv = df.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Download CSV Report", csv, "hon_qc_report.csv", "text/csv")
+    csv = df.to_csv(index=False).encode('utf-8')
+    st.download_button("Download QC Report as CSV", data=csv, file_name="qc_report.csv", mime="text/csv")
