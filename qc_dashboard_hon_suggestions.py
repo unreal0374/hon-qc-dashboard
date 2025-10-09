@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 from PIL import Image
@@ -7,13 +8,13 @@ import io
 qc_criteria = [
     {
         "name": "Logo Placement",
-        "description": "Ensure logo is present and correctly placed if applicable.",
+        "description": "Ensure the logo is present and correctly placed if applicable.",
         "weight": 10,
         "suggestion": "Ensure the logo is visible, correctly placed, and not obstructed by other elements."
     },
     {
         "name": "Color Palette",
-        "description": "Use light, airy neutrals with vibrant pops. Avoid overly muted, dark, or clashing patterns.",
+        "description": "Use light, airy neutrals with vibrant pops. Avoid dark or clashing patterns.",
         "weight": 15,
         "suggestion": "Use lighter neutrals with vibrant pops. Avoid overly dark tones or clashing patterns."
     },
@@ -25,13 +26,13 @@ qc_criteria = [
     },
     {
         "name": "Image Quality",
-        "description": "Bright, natural lighting with soft shadows. Avoid harsh or fluorescent lighting.",
+        "description": "Bright, natural lighting with soft shadows. Avoid harsh lighting.",
         "weight": 10,
         "suggestion": "Improve lighting—use natural or soft diffused light. Avoid harsh shadows or low resolution."
     },
     {
         "name": "Composition",
-        "description": "Product should be the focal point. Use eye-level or overhead angles. Avoid clutter.",
+        "description": "Product should be the focal point. Use eye-level or overhead angles.",
         "weight": 15,
         "suggestion": "Make the product the focal point. Use clean spacing and avoid clutter."
     },
@@ -49,27 +50,29 @@ qc_criteria = [
     },
     {
         "name": "Architectural Elements",
-        "description": "Include realistic flooring, windows, and wall treatments. Avoid traditional styles.",
+        "description": "Include realistic flooring, windows, and wall treatments.",
         "weight": 10,
-        "suggestion": "Include realistic architectural elements. Avoid traditional or uninspiring styles."
+        "suggestion": "Include realistic flooring, windows, and wall treatments. Avoid traditional styles."
     },
     {
         "name": "Vibe/Impression",
-        "description": "Energetic, business casual, approachable. Avoid overly formal or unrealistic settings.",
+        "description": "Energetic, business casual, approachable. Avoid overly formal settings.",
         "weight": 10,
         "suggestion": "Aim for a business casual, approachable feel. Avoid overly formal or sterile environments."
     }
 ]
 
-st.title("HON Image QC Dashboard")
+# Initialize session state for storing results
+if "results" not in st.session_state:
+    st.session_state.results = []
 
-uploaded_files = st.file_uploader("Upload Images for Review", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
+st.title("HON Image QC Dashboard (with Suggestions)")
+
+uploaded_files = st.file_uploader("Upload images for review", type=["png", "jpg", "jpeg"], accept_multiple_files=True)
 
 if uploaded_files:
-    results = []
-
     for uploaded_file in uploaded_files:
-        st.header(f"Review: {uploaded_file.name}")
+        st.header(f"Reviewing: {uploaded_file.name}")
         image = Image.open(uploaded_file)
         st.image(image, caption=uploaded_file.name, use_column_width=True)
 
@@ -88,29 +91,33 @@ if uploaded_files:
             total_score += weighted_score
 
             if score < 3:
-                suggestions.append(f"{item['name']}: {item['suggestion']}")
+                suggestions.append(f"- {item['name']}: {item['suggestion']}")
 
-        final_score = total_score / sum([c["weight"] * 5 for c in qc_criteria]) * 100
-        status = "Pass" if final_score >= 80 else "Fail"
+        final_score = round(total_score / 100, 2)
+        status = "Pass" if final_score >= 0.8 else "Fail"
 
-        st.markdown(f"**Final Score:** {final_score:.2f} / 100")
+        st.markdown(f"**Final Score:** {final_score * 100}/100")
         st.markdown(f"**Status:** {status}")
 
         if suggestions:
-            st.markdown("**Suggestions for Improvement:**")
+            st.markdown("### Suggestions for Improvement:")
             for s in suggestions:
-                st.write(f"- {s}")
+                st.markdown(s)
 
-        results.append({
+        # Save results
+        st.session_state.results.append({
             "Image": uploaded_file.name,
-            "Score": round(final_score, 2),
+            "Score": final_score * 100,
             "Status": status,
-            "Suggestions": "; ".join(suggestions)
+            "Suggestions": "\n".join(suggestions)
         })
 
-    st.subheader("Review Summary")
-    df = pd.DataFrame(results)
-    st.dataframe(df)
+    # Display summary table
+    if st.session_state.results:
+        st.subheader("Review Summary")
+        df = pd.DataFrame(st.session_state.results)
+        st.dataframe(df)
 
-    csv = df.to_csv(index=False).encode('utf-8')
-    st.download_button("Download QC Report as CSV", data=csv, file_name="qc_report.csv", mime="text/csv")
+        # Download CSV
+        csv = df.to_csv(index=False).encode("utf-8")
+        st.download_button("Download QC Report as CSV", data=csv, file_name="qc_report.csv", mime="text/csv")
