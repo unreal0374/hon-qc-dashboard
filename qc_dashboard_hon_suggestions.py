@@ -1,6 +1,8 @@
 import streamlit as st
 from PIL import Image, ImageStat
 import pandas as pd
+import numpy as np
+import io
 import os
 
 # Define brand-specific criteria and suggestions
